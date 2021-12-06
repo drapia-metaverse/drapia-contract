@@ -1,79 +1,61 @@
 pragma solidity ^0.8.0;
 
-import "../@openzeppelin/contracts/access/Ownable.sol";
 import "../@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "../@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "../@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 
-abstract contract DRA20Payable is ERC20, ERC20Permit, Ownable {
-    address private drapiaCashier;
+abstract contract DRA20Payable is ERC20, ERC20Permit, AccessControlEnumerable {
+    struct ChannelData {
+        address orderSigner;
+        address cashier;
+        mapping(uint256 => bool) usedInvoices;
+    }
 
-    mapping(uint256 => address) private businessCashiers;
-
-    bool private useDrapiaCashier;
-
-    mapping(uint256 => mapping(uint256 => bool)) usedInvoices;
+    mapping(uint256 => ChannelData) public paymentChannels;
 
     // solhint-disable-next-line var-name-mixedcase
     bytes32 private immutable _PAYMENT_TYPEHASH =
-    keccak256("Payment(uint256 channelId, uint256 invoiceNo, uint256 amount, uint256 deadline)");
+    keccak256("Payment(uint256 channelId,uint256 invoiceNo,uint256 amount,uint256 deadline)");
 
-    event DrapiaCashierChanged(address indexed previousDrapiaCashier, address indexed newDrapiaCashier);
-
-    event BusinessCashierChanged(uint256 indexed channelId, address indexed previousBusinessCashier, address indexed newBusinessCashier);
-
-    event UseDrapiaCashier(bool useDrapiaCashier);
+    event PaymentChannelChanged(uint256 indexed channelId, address oldOrderSigner, address oldCashier, address indexed newOrderSigner, address indexed newCashier);
 
     event Payment(uint256 indexed channelId, uint256 indexed invoiceNo, address indexed sender, address recipient, uint256 amount);
 
-    constructor(string memory name, string memory symbol, address owner) ERC20(name, symbol) ERC20Permit(name) {
-        drapiaCashier = owner;
-        transferOwnership(owner);
+    bytes32 public constant PAYMENT_MANAGER_ROLE = keccak256("PAYMENT_MANAGER_ROLE");
+
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) ERC20Permit(name) {
+        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        _setupRole(PAYMENT_MANAGER_ROLE, _msgSender());
     }
 
-    function setUseDrapiaCashier(bool _useDrapiaCashier) external onlyOwner {
-        useDrapiaCashier = _useDrapiaCashier;
-        emit UseDrapiaCashier(_useDrapiaCashier);
-    }
-
-    function setDrapiaCashier(address newDrapiaCashier) external onlyOwner {
-        require(newDrapiaCashier != address(0), "DRA20Payable: new drapiaCashier is the zero address");
-        address oldDrapiaCashier = drapiaCashier;
-        drapiaCashier = newDrapiaCashier;
-        emit DrapiaCashierChanged(oldDrapiaCashier, newDrapiaCashier);
-    }
-
-    function setBusinessCashier(uint256 channelId, address newBusinessCashier) external onlyOwner {
-        require(channelId > 0, "DRA20Payable: channelId is zero");
-        address oldBusinessCashier = businessCashiers[channelId];
-        businessCashiers[channelId] = newBusinessCashier;
-        emit BusinessCashierChanged(channelId, oldBusinessCashier, newBusinessCashier);
+    function setPaymentChannel(uint256 channelId, address newOrderSigner, address newCashier) external onlyRole(PAYMENT_MANAGER_ROLE) {
+        require(channelId >= 0, "DRA20Payable: channelId is negative");
+        require((newOrderSigner != address(0) && newCashier != address(0))
+            || (newOrderSigner == address(0) && newCashier == address(0)), "DRA20Payable: newOrderSigner is address(0) while newCashier is not, and vice versa");
+        ChannelData storage paymentChannel = paymentChannels[channelId];
+        address oldOrderSigner = paymentChannel.orderSigner;
+        address oldCashier = paymentChannel.cashier;
+        paymentChannel.orderSigner = newOrderSigner;
+        paymentChannel.cashier = newCashier;
+        emit PaymentChannelChanged(channelId, oldOrderSigner, oldCashier, newOrderSigner, newCashier);
     }
 
     function payment(uint256 channelId, uint256 invoiceNo, uint256 amount, uint256 deadline, bytes memory signature) external {
         require(block.timestamp <= deadline, "DRA20Payable: expired deadline");
-        require(!usedInvoices[channelId][invoiceNo], "DRA20Payable: order already paid");
-        address orderSigner;
-        if (channelId == 0) {
-            orderSigner = drapiaCashier;
-        } else {
-            orderSigner = businessCashiers[channelId];
-            require(orderSigner != address(0), "DRA20Payable: invalid channelId");
-        }
+        ChannelData storage paymentChannel = paymentChannels[channelId];
+        require(paymentChannel.orderSigner != address(0) && paymentChannel.cashier != address(0), "DRA20Payable: invalid channelId");
+        require(!paymentChannel.usedInvoices[invoiceNo], "DRA20Payable: order already paid");
+
         bytes32 structHash = keccak256(abi.encode(_PAYMENT_TYPEHASH, channelId, invoiceNo, amount, deadline));
-
         bytes32 hash = _hashTypedDataV4(structHash);
-
         address signer = ECDSA.recover(hash, signature);
+        require(signer == paymentChannel.orderSigner, "DRA20Payable: invalid signature");
 
-        require(signer == orderSigner, "DRA20Payable: invalid signature");
-        address cashier = orderSigner;
-        if (useDrapiaCashier) {
-            cashier = drapiaCashier;
-        }
-        usedInvoices[channelId][invoiceNo] = true;
-        _transfer(msg.sender, cashier, amount);
-        emit Payment(channelId, invoiceNo, msg.sender, cashier, amount);
+        address sender = _msgSender();
+        paymentChannel.usedInvoices[invoiceNo] = true;
+        _transfer(sender, paymentChannel.cashier, amount);
+        emit Payment(channelId, invoiceNo, sender, paymentChannel.cashier, amount);
     }
 }

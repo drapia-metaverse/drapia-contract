@@ -23,6 +23,17 @@ contract DRA1155 is Context, IDRA1155, ERC721, ERC1155 {
         super.supportsInterface(interfaceId);
     }
 
+    function safeBatchTransferFrom(
+        address from,
+        address to,
+        uint256[] calldata tokenIds,
+        bytes memory data
+    ) public virtual {
+        for (uint256 i = 0; i < tokenIds.length; ++i) {
+            safeTransferFrom(from, to, tokenIds[i], data);
+        }
+    }
+
     function setApprovalForAll(address operator, bool approved) public override(ERC721, ERC1155, IDRA1155) {
         _setApprovalForAll(_msgSender(), operator, approved);
     }

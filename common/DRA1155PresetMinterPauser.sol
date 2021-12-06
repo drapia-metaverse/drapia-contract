@@ -59,7 +59,7 @@ contract DRA1155PresetMinterPauser is Context, AccessControlEnumerable, DRA1155B
 
         // We cannot just use balanceOf to create the new tokenId because tokens
         // can be burned (destroyed), so we need a separate counter.
-        _mint(to, id);
+        _safeMint(to, id);
     }
 
     /**

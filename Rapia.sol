@@ -1,13 +1,11 @@
 pragma solidity ^0.8.0;
 
 import "./@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import "./@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "./@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
 import "./common/DRA20Payable.sol";
-import "./common/DRA20Withdrawable.sol";
-import "./common/DRA1155Withdrawable.sol";
+import "./common/DRAWithdrawable.sol";
 
-contract Rapia is Context, AccessControlEnumerable, DRA20Payable, ERC20Burnable, ERC20Pausable, DRA20Withdrawable, DRA1155Withdrawable {
+contract Rapia is Context, DRA20Payable, ERC20Burnable, ERC20Pausable, DRAWithdrawable {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
@@ -17,11 +15,11 @@ contract Rapia is Context, AccessControlEnumerable, DRA20Payable, ERC20Burnable,
      *
      * See {ERC20-constructor}.
      */
-    constructor(string memory name, string memory symbol, address owner) public DRA20Payable(name, symbol, owner) {
-        _setupRole(DEFAULT_ADMIN_ROLE, owner);
+    constructor(string memory name, string memory symbol) public DRA20Payable(name, symbol) {
+        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
 
-        _setupRole(MINTER_ROLE, owner);
-        _setupRole(PAUSER_ROLE, owner);
+        _setupRole(MINTER_ROLE, _msgSender());
+        _setupRole(PAUSER_ROLE, _msgSender());
     }
 
     /**
@@ -33,8 +31,7 @@ contract Rapia is Context, AccessControlEnumerable, DRA20Payable, ERC20Burnable,
      *
      * - the caller must have the `MINTER_ROLE`.
      */
-    function mint(address to, uint256 amount) external virtual {
-        require(hasRole(MINTER_ROLE, _msgSender()), "Rapia: must have minter role to mint");
+    function mint(address to, uint256 amount) external virtual onlyRole(MINTER_ROLE) {
         _mint(to, amount);
     }
 
@@ -47,8 +44,7 @@ contract Rapia is Context, AccessControlEnumerable, DRA20Payable, ERC20Burnable,
      *
      * - the caller must have the `PAUSER_ROLE`.
      */
-    function pause() external virtual {
-        require(hasRole(PAUSER_ROLE, _msgSender()), "Rapia: must have pauser role to pause");
+    function pause() external virtual onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
@@ -61,8 +57,7 @@ contract Rapia is Context, AccessControlEnumerable, DRA20Payable, ERC20Burnable,
      *
      * - the caller must have the `PAUSER_ROLE`.
      */
-    function unpause() external virtual {
-        require(hasRole(PAUSER_ROLE, _msgSender()), "Rapia: must have pauser role to unpause");
+    function unpause() external virtual onlyRole(PAUSER_ROLE) {
         _unpause();
     }
 
