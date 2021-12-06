@@ -45,17 +45,19 @@ abstract contract DRA20Payable is ERC20, ERC20Permit, AccessControlEnumerable {
     function payment(uint256 channelId, uint256 invoiceNo, uint256 amount, uint256 deadline, bytes memory signature) external {
         require(block.timestamp <= deadline, "DRA20Payable: expired deadline");
         ChannelData storage paymentChannel = paymentChannels[channelId];
-        require(paymentChannel.orderSigner != address(0) && paymentChannel.cashier != address(0), "DRA20Payable: invalid channelId");
+        address orderSigner = paymentChannel.orderSigner;
+        address cashier = paymentChannel.cashier;
+        require(orderSigner != address(0) && cashier != address(0), "DRA20Payable: invalid channelId");
         require(!paymentChannel.usedInvoices[invoiceNo], "DRA20Payable: order already paid");
 
         bytes32 structHash = keccak256(abi.encode(_PAYMENT_TYPEHASH, channelId, invoiceNo, amount, deadline));
         bytes32 hash = _hashTypedDataV4(structHash);
         address signer = ECDSA.recover(hash, signature);
-        require(signer == paymentChannel.orderSigner, "DRA20Payable: invalid signature");
+        require(signer == orderSigner, "DRA20Payable: invalid signature");
 
         address sender = _msgSender();
         paymentChannel.usedInvoices[invoiceNo] = true;
-        _transfer(sender, paymentChannel.cashier, amount);
-        emit Payment(channelId, invoiceNo, sender, paymentChannel.cashier, amount);
+        _transfer(sender, cashier, amount);
+        emit Payment(channelId, invoiceNo, sender, cashier, amount);
     }
 }
