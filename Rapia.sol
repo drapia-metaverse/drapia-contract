@@ -16,8 +16,6 @@ contract Rapia is Context, DRA20Payable, ERC20Burnable, ERC20Pausable, DRAWithdr
      * See {ERC20-constructor}.
      */
     constructor(string memory name, string memory symbol) public DRA20Payable(name, symbol) {
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-
         _setupRole(MINTER_ROLE, _msgSender());
         _setupRole(PAUSER_ROLE, _msgSender());
     }

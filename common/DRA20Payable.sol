@@ -60,4 +60,8 @@ abstract contract DRA20Payable is ERC20, ERC20Permit, AccessControlEnumerable {
         _transfer(sender, cashier, amount);
         emit Payment(channelId, invoiceNo, sender, cashier, amount);
     }
+
+    function isSettled(uint256 channelId, uint256 invoiceNo) external view returns (bool) {
+        return paymentChannels[channelId].usedInvoices[invoiceNo];
+    }
 }
