@@ -2,7 +2,6 @@ pragma solidity ^0.8.0;
 
 import "./IDRA1155.sol";
 import "../@openzeppelin/contracts/utils/Context.sol";
-import "../@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "../@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "../@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
@@ -20,13 +19,13 @@ contract DRA1155 is Context, IDRA1155, ERC721, ERC1155 {
     interfaceId == type(IERC1155MetadataURI).interfaceId ||
     interfaceId == type(IERC721).interfaceId ||
     interfaceId == type(IERC721Metadata).interfaceId ||
-        super.supportsInterface(interfaceId);
+        interfaceId == type(IERC165).interfaceId;
     }
 
     function safeBatchTransferFrom(
         address from,
         address to,
-        uint256[] calldata tokenIds,
+        uint256[] memory tokenIds,
         bytes memory data
     ) public virtual {
         for (uint256 i = 0; i < tokenIds.length; ++i) {
