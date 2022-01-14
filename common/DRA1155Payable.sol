@@ -16,6 +16,8 @@ abstract contract DRA1155Payable is DRA1155Permit, AccessControlEnumerable {
 
     mapping(uint256 => ChannelData) public paymentChannels;
 
+    uint256 public reserveFactor = 1000;
+
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public immutable _PAYMENT_TYPEHASH =
     keccak256("Payment(uint256 channelId,uint256 invoiceNo,uint256 deadline,uint256[] nftItems,uint256[] ftItems,uint256[] ftAmounts)");
@@ -34,6 +36,8 @@ abstract contract DRA1155Payable is DRA1155Permit, AccessControlEnumerable {
 
     event ItemWithdrawal(uint256 indexed channelId, uint256 indexed invoiceNo, DRA1155 itemContract, address sender, address indexed recipient, uint256[] nftItems, uint256[] ftItems, uint256[] ftAmounts);
 
+    event ReserveFactorChanged(uint256 oldReserveFactor, uint256 newReserveFactor);
+
     bytes32 public constant PAYMENT_MANAGER_ROLE = keccak256("PAYMENT_MANAGER_ROLE");
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -51,7 +55,6 @@ abstract contract DRA1155Payable is DRA1155Permit, AccessControlEnumerable {
     }
 
     function setPaymentChannel(uint256 channelId, address newOrderSigner, address newCashier) external onlyRole(PAYMENT_MANAGER_ROLE) {
-        require(channelId >= 0, "DRA1155Payable: channelId is negative");
         require((newOrderSigner != address(0) && newCashier != address(0))
             || (newOrderSigner == address(0) && newCashier == address(0)), "DRA1155Payable: newOrderSigner is address(0) while newCashier is not, and vice versa");
         ChannelData storage paymentChannel = paymentChannels[channelId];
@@ -60,6 +63,12 @@ abstract contract DRA1155Payable is DRA1155Permit, AccessControlEnumerable {
         paymentChannel.orderSigner = newOrderSigner;
         paymentChannel.cashier = newCashier;
         emit PaymentChannelChanged(channelId, oldOrderSigner, oldCashier, newOrderSigner, newCashier);
+    }
+
+    function setReserveFactor(uint256 newReserveFactor) external onlyRole(PAYMENT_MANAGER_ROLE) {
+        uint256 oldReserveFactor = reserveFactor;
+        reserveFactor = newReserveFactor;
+        emit ReserveFactorChanged(oldReserveFactor, newReserveFactor);
     }
 
     function paymentFrom(uint256 channelId, uint256 invoiceNo, uint256 deadline, address sender, uint256[] memory nftItems, uint256[] memory ftItems, uint256[] memory ftAmounts, bytes memory signature) external {
@@ -152,7 +161,7 @@ abstract contract DRA1155Payable is DRA1155Permit, AccessControlEnumerable {
         for (uint256 i = 0; i < ftItems.length; ++i) {
             ftBalance = balanceOf(cashier, ftItems[i]);
             if (ftBalance < ftAmounts[i]) {
-                _mint(cashier, ftItems[i], 1000 * ftAmounts[i], "");
+                _mint(cashier, ftItems[i], reserveFactor * ftAmounts[i], "");
             }
         }
         _safeBatchTransferFrom(cashier, recipient, ftItems, ftAmounts, "");
