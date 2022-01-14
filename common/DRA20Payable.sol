@@ -29,7 +29,6 @@ abstract contract DRA20Payable is ERC20, ERC20Permit, AccessControlEnumerable {
     }
 
     function setPaymentChannel(uint256 channelId, address newOrderSigner, address newCashier) external onlyRole(PAYMENT_MANAGER_ROLE) {
-        require(channelId >= 0, "DRA20Payable: channelId is negative");
         require((newOrderSigner != address(0) && newCashier != address(0))
             || (newOrderSigner == address(0) && newCashier == address(0)), "DRA20Payable: newOrderSigner is address(0) while newCashier is not, and vice versa");
         ChannelData storage paymentChannel = paymentChannels[channelId];
