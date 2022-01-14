@@ -38,7 +38,6 @@ contract DRAPaymentGateway is DRAWithdrawable, EIP712 {
     }
 
     function setPaymentChannel(uint256 channelId, address newOrderSigner, address newCashier) external onlyRole(PAYMENT_MANAGER_ROLE) {
-        require(channelId >= 0, "DRAPaymentGateway: channelId is negative");
         require((newOrderSigner != address(0) && newCashier != address(0))
             || (newOrderSigner == address(0) && newCashier == address(0)), "DRAPaymentGateway: newOrderSigner is address(0) while newCashier is not, and vice versa");
         ChannelData storage paymentChannel = paymentChannels[channelId];
@@ -49,7 +48,7 @@ contract DRAPaymentGateway is DRAWithdrawable, EIP712 {
         emit PaymentChannelChanged(channelId, oldOrderSigner, oldCashier, newOrderSigner, newCashier);
     }
 
-    function payment(uint256 channelId, uint256 invoiceNo, uint256 deadline, IERC20 tokenContract, address sender, uint256 amount, bytes memory signature) external {
+    function payment(uint256 channelId, uint256 invoiceNo, uint256 deadline, IERC20 tokenContract, uint256 amount, bytes memory signature) external {
         require(block.timestamp <= deadline, "DRAPaymentGateway: expired deadline");
         ChannelData storage paymentChannel = paymentChannels[channelId];
         address orderSigner = paymentChannel.orderSigner;
@@ -62,6 +61,7 @@ contract DRAPaymentGateway is DRAWithdrawable, EIP712 {
         address signer = ECDSA.recover(hash, signature);
         require(signer == orderSigner, "DRAPaymentGateway: invalid signature");
 
+        address sender = _msgSender();
         paymentChannel.usedInvoices[invoiceNo] = true;
         tokenContract.safeTransferFrom(sender, cashier, amount);
         emit Payment(channelId, invoiceNo, tokenContract, sender, cashier, amount);
