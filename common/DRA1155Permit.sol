@@ -73,7 +73,7 @@ abstract contract DRA1155Permit is DRA1155, IDRA1155Permit, EIP712 {
         _setApprovalForAll(owner, operator, true);
     }
 
-    function renounceApprovalForAll(address owner, address operator) external {
+    function renounceApprovalForAll(address owner, address operator) external override {
         require(operator == _msgSender(), "DRA1155Permit: can only renounce ApprovalForAll for self");
         _setApprovalForAll(owner, operator, false);
     }
